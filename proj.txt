@@ -1,0 +1,121 @@
+law(trivial,language(coffeescript))
+	
+UPON "sent", ->
+	if @message.type is "initializeManager" and @sender.startsWith("manager") and @receiver.startsWith("manager")
+		controllerIP = @message.ip
+		print controllerIP
+		DO "set", key: "count", value: 1
+		DO "set", key: "founders", value: {}
+		DO "set", key: "members", value: {}
+		DO "set", key: "controllerIP", value: controllerIP
+		DO "forward", receiver: @receiver, sender: @sender, message: {"type": @message.type, "text": "Congratulations!! You are initialized as a manager. "}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "initializeManager" and @sender.startsWith("manager") and @receiver.startsWith("manager")
+		DO "deliver", message: @message.text
+		return true
+
+UPON "sent", ->
+	if @message.type is "registerFounder" and @receiver.startsWith("manager")
+		DO "forward", receiver: @receiver, sender: @sender, message: {"type": @message.type, "founderName":@sender, "alias": @message.alias}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "registerFounder" and @receiver.startsWith("manager")
+		founderAlias = @message.alias
+		foundersList = CS("founders")
+		if founderAlias of foundersList
+			print @message.alias
+			DO "forward", sender: @sender, receiver: @message.founderName, message: "Your alias has already been choosen by other founder. Please choose another alias. "		
+			return true
+	
+		foundersList[@message.alias] = @message.founderName
+		DO "set", key: "founders", value: foundersList
+
+		DO "forward", sender: @receiver, receiver: @sender, message: "Congratulations. You have been regsitered as a founder."		
+		DO "deliver", sender: @self, receiver: @self, message: @message.alias+ " has been registered as founder."
+		return true		
+
+UPON "sent", ->
+	if @message.type is "getInfo" and @sender.startsWith("manager") and @receiver.startsWith("manager")
+		DO "deliver", receiver: @receiver, sender: @sender, message: {"type": @message.type, "controllerIP": CS("controllerIP"), "founders": CS("founders"), "users": CS("members")}
+		return true
+
+UPON "sent", ->
+	if @message.type is "registerMember" and @receiver.startsWith("manager")
+		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "askApproval", "alias": @message.alias}
+		DO "deliver", message: "Waiting for approval from founders. "
+		return true
+
+UPON "arrived", ->
+	if @message.type is "askApproval" and @receiver.startsWith("manager")
+		if @message.alias of CS("members")
+			DO "forward", sender: @self, receiver: @sender, message: "Your alias has already been choosen by other members. Please choose another alias."
+			return true
+
+		DO "set", key: @message.alias, value: @sender
+		DO "set", key: "APPROVAL:"+@message.alias, value: []
+		for f, fAddr of CS("founders")
+			DO "forward", sender: @self, receiver: fAddr, message: {"type": "memberApproval", "alias": @message.alias}
+
+		return true 
+
+UPON "arrived", ->
+	if @message.type is "memberApprovalConfirm" and @receiver.startsWith("manager")
+		approvalList = CS("APPROVAL:"+@message.alias)
+		if @sender of approvalList
+			DO "forward", receiver: @sender, sender: @receiver, message: "You have already approved this member."
+			return true
+
+		if @message.result is "yes"
+			newList = approvalList.concat @sender
+			DO "set", key: "APPROVAL:"+@message.alias, value: newList
+		
+		if CS("APPROVAL:"+@message.alias).length == Object.keys(CS("APPROVAL:"+@message.alias)).length
+			users = CS("members")
+			users[@message.alias] = CS(@message.alias)
+			DO "set", key: "members", value: users
+			
+			alias = @message.alias
+			DO "forward", sender: @self, receiver: CS("members")[alias], message: "You are now a member. Congratulations!!"
+			return true
+		return true
+		
+UPON "arrived", ->
+	if @message.type is "revokeMember" and @receiver.startsWith("manager")
+		memberAlias = @message.alias
+		memberAddress = CS("members")[memberAlias]
+
+		users = CS("members")
+		delete users[memberAlias]
+		DO "set", key: "members", value: users
+
+		print "updated Members after removal"
+		for k, v of CS("members")
+			print k+"::"+v
+
+		DO "forward", receiver: memberAddress, sender: @self, message: "Sorry. Your membership has been revoked!"
+		return true
+				
+UPON "sent", ->
+  
+	DO "forward"
+  
+	return true
+    
+
+
+UPON "arrived", ->
+  
+	DO "deliver"
+  
+	return true
+    
+
+
+UPON "disconnected", ->
+  
+	DO "quit"
+  
+	return true
