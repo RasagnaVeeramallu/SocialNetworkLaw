@@ -63,23 +63,25 @@ UPON "arrived", ->
 
 UPON "arrived", ->
 	if @message.type is "memberApprovalConfirm" and @receiver.startsWith("manager")
+		print "Approval"
 		approvalList = CS("APPROVAL:"+@message.alias)
-		if @sender of approvalList
-			DO "forward", receiver: @sender, sender: @receiver, message: "You have already approved this member."
-			return true
 
 		if @message.result is "yes"
 			newList = approvalList.concat @sender
 			DO "set", key: "APPROVAL:"+@message.alias, value: newList
-		
+
+		print CS("APPROVAL:"+@message.alias).length
+		print Object.keys(CS("APPROVAL:"+@message.alias)).length
 		if CS("APPROVAL:"+@message.alias).length == Object.keys(CS("APPROVAL:"+@message.alias)).length
 			users = CS("members")
 			users[@message.alias] = CS(@message.alias)
 			DO "set", key: "members", value: users
-			
+			print "Member Added"
+			for k, v of CS("members")
+				print k+"::"+v
 			alias = @message.alias
 			DO "forward", sender: @self, receiver: CS("members")[alias], message: "You are now a member. Congratulations!!"
-			return true
+			
 		return true
 		
 UPON "arrived", ->
@@ -97,7 +99,56 @@ UPON "arrived", ->
 
 		DO "forward", receiver: memberAddress, sender: @self, message: "Sorry. Your membership has been revoked!"
 		return true
-				
+
+UPON "arrived", ->
+	if @message.type is "setProfile" and @receiver.startsWith("manager")
+		if @message.alias of CS("members")
+			DO "forward", receiver: @sender, sender: @receiver, message: {"type": "updateProfile", "alias": @message.alias, "name": @message.name}
+		else
+			DO "forward", receiver: @sender, sender: @receiver, message: "You are not a member."
+		return true
+
+UPON "arrived", ->
+	if @message.type is "updateProfile" and @sender.startsWith("manager")
+		userInfo = @message
+		delete userInfo["type"]
+		
+		for k, v of userInfo
+			DO "set", key: k, value: v
+			print k+"----"+CS(k)
+
+		DO "deliver", receiver: @receiver, message: "Profile Updated."
+		return true
+		
+UPON "sent", ->
+	if @message.type is "displayProfile"
+		if CS("alias")?
+			DO "deliver", receiver: @receiver, message: {"name": CS("name"), "age": CS("age")}
+		else
+			DO "deliver", message: "Your profile has not yet been set. Please update your profile."
+
+		return true
+
+UPON "arrived", ->
+	if @message.type is "identifyMember" and @receiver.startsWith("manager")
+		if @message.alias of CS("members")
+			reqAlias = CS("members")[@message.alias]
+			DO "forward", sender: @sender, receiver: reqAlias, message: {"type": "sendDetails", "source": @sender, "dest": reqAlias}
+		else
+			DO "forward", sender: @sender, receiver: reqAlias, message: "There is no member with the specified alias."
+		print "information asked"
+		return true
+
+UPON "arrived", ->
+	if @message.type is "sendDetails"
+		if CS("alias")?
+			msgSource = @message.source
+			DO "forward", sender: @receiver, receiver: msgSource, message: {"address": msgSource, "alias": CS("alias"), "name": CS("name"), "age": CS("age")}
+		else
+			DO "forward", sender: @receiver, receiver: @message.source, message: "the profile of the member you are looking for is not yet set."
+		print "Delivered details"
+		return true
+		
 UPON "sent", ->
   
 	DO "forward"
