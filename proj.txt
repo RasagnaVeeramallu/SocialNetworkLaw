@@ -152,6 +152,14 @@ UPON "arrived", ->
 
 		return true
 
+UPON "sent", ->
+	if @message.type is "joinGroup"
+		if CS("memberFlag")?
+			DO "forward", sender: @sender, receiver: @receiver, message: {"type": @message.type, "groupName": @message.groupName}
+		else
+			DO "deliver", sender: @receiver, receiver: @sender, message: "You are not a member."
+		return true
+		
 UPON "arrived", ->
 	if @message.type is "joinGroup" and @receiver.startsWith("manager")
 		ip = @sender.split("@")[1]
@@ -210,6 +218,36 @@ UPON "arrived", ->
 				DO "forward", sender: @self, receiver: @sender, message: "The group can be deleted by group owners only."
 		return true
 				
+UPON "sent", ->
+	if @message.type is "removeFromGroup"
+		ip = @sender.split("@")[1]
+		if not CS("memberFlag")?
+			DO "deliver", sender: "manager"+"@"+ip, receiver: @self, message: "you are not a member."
+		else
+			DO "forward", sender: @self, receiver: "group"+"@"+ip, message: {"type": @message.type, "groupName": @message.groupName, "user": @self}
+		print "message sent from delete initiater."
+		return true
+
+UPON "arrived", -> 
+	if @message.type is "removeFromGroup" and @receiver.startsWith("group")
+		if CS("groupOwners")[@message.groupName] is @message.user
+			DO "forward", sender: @self, receiver: @message.user, message: "You are the owner of the group. Please delete the group instead or transfer your ownership."
+		else
+			groupMembers = CS(@message.groupName)
+			if @message.user not in groupMembers
+				DO "forward", sender: @self, receiver: @message.user, message: "You are not a member of the group - "+@message.groupName	
+			else
+				print "user to delete"
+				print @message.user
+
+				groupMembers.splice(index, 1) for index, value of groupMembers when value in [@message.user]
+				print groupMembers
+
+				DO "set", key: @message.groupName, value: groupMembers
+				print CS(@message.groupName)
+		return true			
+			
+		
 
 UPON "sent", ->
 	DO "forward"
