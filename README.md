@@ -25,4 +25,4 @@ manager@192.168.1.10 {"type": "joinGroup", "groupName": "group1"}
 
 user2@192.168.1.10 {"type": "groupMembershipApproval", "approval": "yes", "user": "user2@192.168.1.10", "groupName": "group1"}
 
-manager@192.168.1.10 {"type": "removeFromGroup", "groupName": "group1"}
+manager@192.168.1.10 {"type": "leaveGroup", "groupName": "group1"}
