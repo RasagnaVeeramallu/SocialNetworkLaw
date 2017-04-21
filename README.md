@@ -28,3 +28,7 @@ user2@192.168.1.10 {"type": "groupMembershipApproval", "approval": "yes", "user"
 manager@192.168.1.10 {"type": "leaveGroup", "groupName": "group1"}
 
 manager@192.168.1.11 {"type": "removeFromGroup", "groupName": "group2", "user": "user1@192.168.1.11"}
+
+manager@192.168.1.11 {"type": "sendGroupMessage", "groupName": "group2", "text": "text group message"}
+
+user1@192.168.1.11 {"type": "sendMessage", "text": "test personal message"}
