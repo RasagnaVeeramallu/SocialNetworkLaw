@@ -32,3 +32,9 @@ manager@192.168.1.11 {"type": "removeFromGroup", "groupName": "group2", "user": 
 manager@192.168.1.11 {"type": "sendGroupMessage", "groupName": "group2", "text": "text group message"}
 
 user1@192.168.1.11 {"type": "sendMessage", "text": "test personal message"}
+
+user2@192.168.1.11 {"type": "transferGroupOwnership", "groupName": "group1"}
+
+user1@192.168.1.11 {"type": "acceptGroupOwnership", "approval": "yes", "groupName": "group1"}
+
+manager@192.168.1.11 {"type": "getGroupInfo", "groupName": "group1"}
