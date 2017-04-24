@@ -63,7 +63,7 @@ UPON "arrived", ->
 		return true
 
 UPON "arrived", ->
-	if @message.type is "userApproval"
+	if @message.type is "userApproval" and @message.approval is "yes"
 		if CS("founderApprovals")? and @sender not in CS("founderApprovals")
 			newList = CS("founderApprovals").concat(@sender)
 			DO "set", key: "founderApprovals", value: newList
@@ -74,7 +74,33 @@ UPON "arrived", ->
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: "Founders approved user: "+@receiver
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: {"type": "addUser", "name": CS("name")}
 				DO "deliver", receiver: @self, message: "Membership approved."
+				DO "deliver", receiver: @self, message: "Please set-up your profile."
 			return true
+
+UPON "sent", ->
+	if @message.type is "profile"
+		DO "set", key: "username", value: @message.username
+		DO "set", key: "dob", value: @message.dob
+		DO "set", key: "archive", value: []
+		return true
+		
+
+UPON "sent", ->
+	if @message.type is "viewProfile"
+		DO "deliver", message: "Your profile"
+		DO "deliver", message: {"type": "user profile", "username": CS("username"), "date of birth": CS("dob")}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "getProfile"
+		DO "forward", sender: @self, receiver: @receiver, message: {"type": "sendProfile", "to": @sender}
+		return true
+
+UPON "sent", ->
+	if @message.type is "profileDetails"
+		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "requestedProfile", "username": CS("username"), "date of birth": CS("dob")}
+		return true
+		
 	
 UPON "arrived", ->
 	if @message.type is "addUser" and @receiver.startsWith("manager")
@@ -299,7 +325,7 @@ UPON "arrived", ->
 
 UPON "arrived", ->
 	if @message.type is "sendMessage"
-		DO "deliver", sender: @sender, receiver: @receiver, message: {"type": "personalMessage", "from": @sender, "text": @message.text}
+		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "personalMessage", "from": @sender, "text": @message.text}
 		return true
 
 UPON "sent", ->
@@ -350,7 +376,24 @@ UPON "arrived", ->
 		else
 			DO "forward", sender: @self, receiver: @sender, message: "No group with the name - "+@message.groupName+ " exists."
 		return true
-				
+
+UPON "arrived", ->
+	if @message.type is "groupMessageReceived" or @message.type is "personalMessage"
+		DO "deliver"
+		oldMsgs = CS("archive")
+		print @message
+		newMsgs = oldMsgs.concat @message
+		DO "set", key: "archive", value: newMsgs
+		return true
+						
+UPON "sent", ->
+	if @message.type is "viewArchive"
+		DO "deliver", message: "archive"
+		for msg in CS("archive")
+			DO "deliver", message: msg
+
+		return true
+		
 
 UPON "sent", ->
 	DO "forward"
