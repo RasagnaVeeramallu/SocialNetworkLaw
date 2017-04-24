@@ -219,7 +219,7 @@ UPON "arrived", ->
 		return true
 				
 UPON "sent", ->
-	if @message.type is "removeFromGroup"
+	if @message.type is "leaveGroup"
 		ip = @sender.split("@")[1]
 		if not CS("memberFlag")?
 			DO "deliver", sender: "manager"+"@"+ip, receiver: @self, message: "you are not a member."
@@ -229,7 +229,7 @@ UPON "sent", ->
 		return true
 
 UPON "arrived", -> 
-	if @message.type is "removeFromGroup" and @receiver.startsWith("group")
+	if @message.type is "leaveGroup" and @receiver.startsWith("group")
 		if CS("groupOwners")[@message.groupName] is @message.user
 			DO "forward", sender: @self, receiver: @message.user, message: "You are the owner of the group. Please delete the group instead or transfer your ownership."
 		else
@@ -245,9 +245,112 @@ UPON "arrived", ->
 
 				DO "set", key: @message.groupName, value: groupMembers
 				print CS(@message.groupName)
-		return true			
+		return true	
+
+UPON "sent", ->
+	if @message.type is "removeFromGroup"
+		ip = @sender.split("@")[1]
+		DO "forward", sender: @sender, receiver: "group"+"@"+ip, message: {"type": "removeFromGroupEnquiry", "groupName": @message.groupName, "from": @sender, "user": @message.user}
+		print "sent to check group owner"
+		return true
+
+UPON "arrived", ->
+	if @message.type is "removeFromGroupEnquiry" and @receiver.startsWith("group")
+		print "remove from Group received"
+		if CS("groupOwners")[@message.groupName] is @message.from
+			groupMembers = CS(@message.groupName)
+			print groupMembers
+			groupMembers.splice(index, 1) for index, value of groupMembers when value in [@message.user]
+			print groupMembers
+
+			DO "set", key: @message.groupName, value: groupMembers
+			print "user removed"
+			DO "forward", sender: @self, receiver: @message.user, message: "You are removed from group - " + @message.groupName
+			print CS(@message.groupName)
+		else
+			print "non-owner tried to delete - "+@sender
+			DO "forward", sender: @self, receiver: @sender, message: "you are not allowed to remove members from group - "+ @message.groupName
+
+		return true	
+
+UPON "sent", ->
+	if @message.type is "sendGroupMessage"
+		ip = @sender.split("@")[1]
+		DO "forward", sender: @self, receiver: "group"+"@"+ip, message: {"type": "groupMessage", "groupName": @message.groupName, "text": @message.text}
+		print "group message forwarded to group manager"
+		return true
+
+UPON "arrived", ->
+	if @message.type is "groupMessage" and @receiver.startsWith("group")
+
+		if not CS(@message.groupName)
+			DO "forward", sender: @self, receiver: @sender, message: "No such group as "+@message.groupName+" exists."
+			return true
+
+		groupMembers = CS(@message.groupName)
+		print "sending group message"
+		if @sender in groupMembers
+			for addr in groupMembers
+				DO "forward", sender: @sender, receiver: addr, message: {"type": "groupMessageReceived", "groupName": @message.groupName, "text": @message.text}
+		else
+			DO "forward", sender: @self, receiver: @sender, message: "You are not a member of the group - "+@message.groupName
+
+		return true		 	
+
+UPON "arrived", ->
+	if @message.type is "sendMessage"
+		DO "deliver", sender: @sender, receiver: @receiver, message: {"type": "personalMessage", "from": @sender, "text": @message.text}
+		return true
+
+UPON "sent", ->
+	if @message.type is "transferGroupOwnership"
+		ip = @sender.split("@")[1]
+		DO "forward", sender: @self, receiver: "group"+"@"+ip, message: {"type": @message.type, "groupName": @message.groupName, "owner": @sender, "transferTo": @receiver}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "transferGroupOwnership" and @receiver.startsWith("group")
+		membersList = CS(@message.groupName)
+		if @message.transferTo not in membersList
+			DO "forward", sender: @self, receiver: @sender, message: @message.transferTo + " is not a member of the group "+@message.groupName
+		else
+			DO "forward", sender: @message.owner, receiver: @message.transferTo, message: "Do you want to take ownership of the group - "+@message.groupName + " from " +@sender+" ?"
+		return true
+
+UPON "sent", ->
+	if @message.type is "acceptGroupOwnership"
+		ip = @sender.split("@")[1]
+		if @message.approval is "yes"
+			DO "forward", sender: @sender, receiver: "group"+"@"+ip, message: {"type": "changeOwner", "groupName": @message.groupName, "newOwner": @sender, "oldOwner": @receiver}
+			DO "forward", sender: @sender, receiver: @receiver, message: "Ownership of group - "+@message.groupName+" has been accepted by "+@sender 
+		if @message.approval is "no"
+			DO "forward", sender: @sender, receiver: @receiver, message: "request to accept ownership of group - "+@message.groupOwner+" has been accepted by "+@sender
+		return true
+
+UPON "arrived", ->
+	if @message.type is  "changeOwner" and @receiver.startsWith("group")
+		owners = CS("groupOwners")
+		if owners[@message.oldOwner] is @message.oldOwner
+			owners[@message.oldOwner] = @message.newOwner
+			DO "set", key: "groupOwners", value: owners
+		return true
 			
-		
+UPON "sent", ->
+	if @message.type is "getGroupInfo"
+		ip = @sender.split("@")[1]
+		DO "forward", sender: @self, receiver: "group"+"@"+ip, message: {"type": @message.type, "groupName": @message.groupName}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "getGroupInfo" and @receiver.startsWith("group")
+		if CS(@message.groupName)
+			members = CS(@message.groupName)
+			owner = CS("groupOwners")[@message.groupName]
+			DO "forward", sender: @self, receiver: @sender, message: {"type": "groupDetails", "groupName": @message.groupName, "owner": owner, "members": members}
+		else
+			DO "forward", sender: @self, receiver: @sender, message: "No group with the name - "+@message.groupName+ " exists."
+		return true
+				
 
 UPON "sent", ->
 	DO "forward"
