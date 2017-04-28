@@ -323,6 +323,14 @@ UPON "arrived", ->
 
 		return true		 	
 
+UPON "sent", ->
+	if @message.type is "sendMessage"
+		if CS("memberFlag")?
+			DO "forward", sender: @sender, receiver: @receiver, message: {"type": @message.type, "text": @message.text}
+		else
+			DO "deliver", message: "You are not a registered member. Please register first."
+		return true
+
 UPON "arrived", ->
 	if @message.type is "sendMessage"
 		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "personalMessage", "from": @sender, "text": @message.text}
@@ -356,9 +364,10 @@ UPON "sent", ->
 UPON "arrived", ->
 	if @message.type is  "changeOwner" and @receiver.startsWith("group")
 		owners = CS("groupOwners")
-		if owners[@message.oldOwner] is @message.oldOwner
-			owners[@message.oldOwner] = @message.newOwner
+		if owners[@message.groupName] is @message.oldOwner
+			owners[@message.groupName] = @message.newOwner
 			DO "set", key: "groupOwners", value: owners
+			print "owner of "+ @message.groupName+" has been changed from "+@message.oldOwner+" to "+@message.newOwner
 		return true
 			
 UPON "sent", ->
