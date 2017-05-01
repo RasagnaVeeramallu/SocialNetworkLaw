@@ -34,6 +34,7 @@ UPON "arrived", ->
 		foundersList = @message.founders.concat(@sender)		
 		DO "set", key: "founders", value: foundersList
 		print CS("founders")
+		DO "set", key: "blog", value: []
 		DO "set", key: "users", value: {}
 		DO "deliver", sender: @sender, receiver: @self, message: "Community has been set up"
 		return true	
@@ -71,6 +72,8 @@ UPON "arrived", ->
 			if CS("founderApprovals").length==3
 				ip = @sender.split("@")[1]
 				DO "set", key: "memberFlag", value: 1
+				DO "set", key: "userWall", value: []
+				DO "set", key: "memberGroups", value: []
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: "Founders approved user: "+@receiver
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: {"type": "addUser", "name": CS("name")}
 				DO "deliver", receiver: @self, message: "Membership approved."
@@ -89,16 +92,22 @@ UPON "sent", ->
 	if @message.type is "viewProfile"
 		DO "deliver", message: "Your profile"
 		DO "deliver", message: {"type": "user profile", "username": CS("username"), "date of birth": CS("dob")}
+		DO "deliver", message: {"member-groups": CS("memberGroups")}
 		return true
 
 UPON "arrived", ->
 	if @message.type is "getProfile"
-		DO "forward", sender: @self, receiver: @receiver, message: {"type": "sendProfile", "to": @sender}
+		ip = @sender.split("@")[1]
+		if @receiver.startsWith("manager")
+			DO "forward", sender: @self, receiver: @message.user+"@"+ip, message: {"type": "sendProfile", "to": @sender}
+		else
+			DO "forward", sender: @self, receiver: @receiver, message: {"type": "sendProfile", "to": @sender}
 		return true
 
 UPON "sent", ->
 	if @message.type is "profileDetails"
 		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "requestedProfile", "username": CS("username"), "date of birth": CS("dob")}
+		DO "forward", sender: @sender, receiver: @receiver, message: {"member-groups": CS("memberGroups")}
 		return true
 		
 	
@@ -163,6 +172,7 @@ UPON "arrived", ->
 			DO "set", key: "groupOwners", value: groupOwners
 			print CS("groupOwners")
 			DO "forward", sender: @sender, receiver: @message.groupOwner, message: "Your group has been created. You are the owner of the group"
+			DO "forward", sender: @sender, receiver: @message.groupOwner, message: {"type": "updateUserGroups", "groupName": @message.groupName}
 		return true
 
 UPON "sent", ->
@@ -205,9 +215,18 @@ UPON "sent", ->
 	if @message.type is "groupMembershipApproval" and @message.approval is "yes"
 		ip = @sender.split("@")[1]
 		DO "forward", sender: @self, receiver: @message.user, message: "your membership to the requested group - "+@message.groupName+" has been approved."
+		DO "forward", sender: @self, receiver: @message.user, message: {"type": "updateUserGroups", "groupName": @message.groupName}
 		DO "forward", sender: @self, receiver: "group"+"@"+ip, message: {"type": "addGroupUser", "groupName": @message.groupName, "user": @message.user}
 		return true
 
+UPON "arrived", ->
+	if @message.type is "updateUserGroups"
+		groups = CS("memberGroups")
+		newGroups = groups.concat @message.groupName
+		DO "set", key: "memberGroups", value: newGroups
+		print CS("memberGroups")
+		return true
+		
 UPON "arrived", ->
 	if @message.type is "addGroupUser"
 		users = CS(@message.groupName)
@@ -403,6 +422,22 @@ UPON "sent", ->
 
 		return true
 		
+UPON "arrived", ->
+	if @message.type is "postBlogMessage" and @receiver.startsWith("manager")
+		print "blog message added"
+		newMessage = {"writer": @sender, "message": @message.text}
+		blogPosts = CS("blog")
+		newBlogPosts = blogPosts.concat newMessage
+		DO "set", key: "blog", value: newBlogPosts
+		return true
+
+UPON "arrived", ->
+	if @message.type is "viewBlog"
+		DO "forward", receiver: @sender, sender: @receiver, message: "Blog Posts: "
+		for msg in CS("blog")
+			DO "forward", sender: @self, receiver: @sender, message: msg
+		return true	
+
 
 UPON "sent", ->
 	DO "forward"
