@@ -48,3 +48,5 @@ user1@172.27.170.226 {"type": "getProfile"}
 user2@172.27.170.226 {"type": "profileDetails"}
 
 manager@172.27.170.226  {"type": "viewArchive"}
+
+{"type": "postBlogMessage", "text": "First test Public Blog Message"}
