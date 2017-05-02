@@ -55,4 +55,4 @@ manager@172.27.170.226  {"type": "viewArchive"}
 
 {"type": "postWallMessage", "text": "testing wall messages1 - user1"}
 
-{"type": "viewWall"}
+{"type": "showWall"}
