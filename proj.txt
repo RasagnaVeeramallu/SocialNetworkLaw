@@ -259,6 +259,7 @@ UPON "arrived", ->
 				print CS(@message.groupName)
 				for user in CS(@message.groupName)
 					DO "forward", sender: @self, receiver: user, message: @message.groupName + " has been deleted."
+					DO "forward", sender: @self, receiver: user, message: {"type": "updateGroupsOnDelete", "user": user, "groupName": @message.groupName}
 				print "messaged group members about delete"
 				DO "unset", key: @message.groupName
 				owners = CS("groupOwners")
@@ -296,7 +297,16 @@ UPON "arrived", ->
 
 				DO "set", key: @message.groupName, value: groupMembers
 				print CS(@message.groupName)
-		return true	
+				DO "forward", sender: @self, receiver: @message.user, message: {"type": "updateGroupsOnDelete", "user": @message.user, "groupName": @message.groupName}
+		return true
+
+UPON "arrived", ->
+	if @message.type is "updateGroupsOnDelete"
+		groups = CS("memberGroups")
+		groups.splice(index, 1) for index, value of groups when value in [@message.groupName]
+		
+		DO "set", key: "memberGroups", value: groups
+		return true
 
 UPON "sent", ->
 	if @message.type is "removeFromGroup"
@@ -318,6 +328,8 @@ UPON "arrived", ->
 			print "user removed"
 			DO "forward", sender: @self, receiver: @message.user, message: "You are removed from group - " + @message.groupName
 			print CS(@message.groupName)
+
+			DO "forward", sender: @self, receiver: @message.user, message: {"type": "updateGroupsOnDelete", "user": @message.user, "groupName": @message.groupName}
 		else
 			print "non-owner tried to delete - "+@sender
 			DO "forward", sender: @self, receiver: @sender, message: "you are not allowed to remove members from group - "+ @message.groupName
@@ -457,11 +469,19 @@ UPON "arrived", ->
 		return true
 
 UPON "sent", ->
+	if @message.type is "showWall"
+		DO "deliver", message: "Your Wall Posts"
+		for msg in CS("userWall")
+			DO "deliver", message: msg
+		return true
+
+UPON "arrived", ->
 	if @message.type is "viewWall"
 		DO "deliver", message: "Your Wall Posts"
 		for msg in CS("userWall")
 			DO "deliver", message: msg
 		return true
+
 
 UPON "sent", ->
 	DO "forward"
