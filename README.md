@@ -51,6 +51,8 @@ manager@172.27.170.226  {"type": "viewArchive"}
 
 {"type": "postBlogMessage", "text": "First test Public Blog Message"}
 
+{"type": "viewBlog"}
+
 {"type": "postWallMessage", "text": "testing wall messages1 - user1"}
 
 {"type": "viewWall"}
