@@ -72,12 +72,12 @@ UPON "arrived", ->
 			if CS("founderApprovals").length==3
 				ip = @sender.split("@")[1]
 				DO "set", key: "memberFlag", value: 1
-				DO "set", key: "userWall", value: []
-				DO "set", key: "memberGroups", value: []
+				
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: "Founders approved user: "+@receiver
 				DO "forward", sender: @self, receiver: "manager"+"@"+ip, message: {"type": "addUser", "name": CS("name")}
 				DO "deliver", receiver: @self, message: "Membership approved."
 				DO "deliver", receiver: @self, message: "Please set-up your profile."
+				
 			return true
 
 UPON "sent", ->
@@ -85,6 +85,8 @@ UPON "sent", ->
 		DO "set", key: "username", value: @message.username
 		DO "set", key: "dob", value: @message.dob
 		DO "set", key: "archive", value: []
+		DO "set", key: "userWall", value: []
+		DO "set", key: "memberGroups", value: []
 		return true
 		
 
@@ -93,6 +95,7 @@ UPON "sent", ->
 		DO "deliver", message: "Your profile"
 		DO "deliver", message: {"type": "user profile", "username": CS("username"), "date of birth": CS("dob")}
 		DO "deliver", message: {"member-groups": CS("memberGroups")}
+		DO "forward", sender: @self, receiver: @self, message: {"type": "viewWall"}
 		return true
 
 UPON "arrived", ->
@@ -108,9 +111,12 @@ UPON "sent", ->
 	if @message.type is "profileDetails"
 		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "requestedProfile", "username": CS("username"), "date of birth": CS("dob")}
 		DO "forward", sender: @sender, receiver: @receiver, message: {"member-groups": CS("memberGroups")}
+		DO "forward", sender: @sender, receiver: @receiver, message: {"type": "Wall Posts: "}
+		for msg in CS("userWall")
+			DO "forward", sender: @sender, receiver: @receiver, message: msg
 		return true
-		
-	
+
+			
 UPON "arrived", ->
 	if @message.type is "addUser" and @receiver.startsWith("manager")
 		u = CS("users")
@@ -438,6 +444,24 @@ UPON "arrived", ->
 			DO "forward", sender: @self, receiver: @sender, message: msg
 		return true	
 
+
+UPON "arrived", ->
+	if @message.type is "postWallMessage"
+		DO "deliver", message: @self
+		DO "deliver", message: CS("userWall")
+		DO "deliver", message: "Message posted on your wall by "+@sender
+		wallMessages = CS("userWall")
+		newMessage = {"writer": @sender, "text": @message.text}
+		newWall = wallMessages.concat newMessage
+		DO "set", key: "userWall", value: newWall
+		return true
+
+UPON "sent", ->
+	if @message.type is "viewWall"
+		DO "deliver", message: "Your Wall Posts"
+		for msg in CS("userWall")
+			DO "deliver", message: msg
+		return true
 
 UPON "sent", ->
 	DO "forward"
